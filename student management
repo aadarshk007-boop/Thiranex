@@ -1,0 +1,208 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+#include <cstdio>
+using namespace std;
+class Student {
+public:
+    int rollNo;
+    char name[50];
+    char course[50];
+    float marks;
+
+    void input() {
+        cout << "Enter Roll Number: ";
+        cin >> rollNo;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        cout << "Enter Student Name: ";
+        cin.getline(name, 50);
+
+        cout << "Enter Course: ";
+        cin.getline(course, 50);
+
+        cout << "Enter Marks: ";
+        cin >> marks;
+    }
+
+    void display() const {
+        cout << left << setw(12) << rollNo
+             << setw(25) << name
+             << setw(20) << course
+             << setw(10) << marks << '\n';
+    }
+};
+
+void addStudent() {
+    Student s;
+    ofstream file("students.dat", ios::binary | ios::app);
+
+    if (!file) {
+        cout << "Error opening file!\n";
+        return;
+    }
+
+    s.input();
+    file.write(reinterpret_cast<char*>(&s), sizeof(s));
+    file.close();
+
+    cout << "Student added successfully!\n";
+}
+
+void displayStudents() {
+    Student s;
+    ifstream file("students.dat", ios::binary);
+
+    if (!file) {
+        cout << "No student records found.\n";
+        return;
+    }
+
+    cout << "\n--- Student Records ---\n";
+    cout << left << setw(12) << "Roll No"
+         << setw(25) << "Name"
+         << setw(20) << "Course"
+         << setw(10) << "Marks" << '\n';
+    cout << string(67, '-') << '\n';
+
+    bool found = false;
+
+    while (file.read(reinterpret_cast<char*>(&s), sizeof(s))) {
+        s.display();
+        found = true;
+    }
+
+    if (!found)
+        cout << "No records available.\n";
+
+    file.close();
+}
+
+void searchStudent() {
+    int roll;
+    Student s;
+    bool found = false;
+
+    cout << "Enter Roll Number to search: ";
+    cin >> roll;
+
+    ifstream file("students.dat", ios::binary);
+
+    while (file.read(reinterpret_cast<char*>(&s), sizeof(s))) {
+        if (s.rollNo == roll) {
+            cout << "\nStudent Found:\n";
+            s.display();
+            found = true;
+            break;
+        }
+    }
+
+    file.close();
+
+    if (!found)
+        cout << "Student not found.\n";
+}
+
+void updateStudent() {
+    int roll;
+    Student s;
+    bool found = false;
+
+    cout << "Enter Roll Number to update: ";
+    cin >> roll;
+
+    fstream file("students.dat",
+                 ios::binary | ios::in | ios::out);
+
+    while (file.read(reinterpret_cast<char*>(&s), sizeof(s))) {
+        if (s.rollNo == roll) {
+            cout << "Enter updated information:\n";
+            s.input();
+
+            // Preserve the original roll number.
+            // The input roll number must remain unchanged.
+            file.seekp(-static_cast<streamoff>(sizeof(s)),
+                       ios::cur);
+            file.write(reinterpret_cast<char*>(&s), sizeof(s));
+
+            found = true;
+            break;
+        }
+    }
+
+    file.close();
+
+    if (found)
+        cout << "Student updated successfully!\n";
+    else
+        cout << "Student not found.\n";
+}
+
+void deleteStudent() {
+    int roll;
+    Student s;
+    bool found = false;
+
+    cout << "Enter Roll Number to delete: ";
+    cin >> roll;
+
+    ifstream inFile("students.dat", ios::binary);
+    ofstream outFile("temp.dat", ios::binary);
+
+    while (inFile.read(reinterpret_cast<char*>(&s), sizeof(s))) {
+        if (s.rollNo == roll) {
+            found = true;
+        } else {
+            outFile.write(reinterpret_cast<char*>(&s), sizeof(s));
+        }
+    }
+
+    inFile.close();
+    outFile.close();
+
+    if (found) {
+        if (remove("students.dat") != 0 ||
+            rename("temp.dat", "students.dat") != 0) {
+            cout << "Error replacing the records file.\n";
+            return;
+        }
+        cout << "Student deleted successfully!\n";
+    } else {
+        remove("temp.dat");
+        cout << "Student not found.\n";
+    }
+}
+
+int main() {
+    int choice;
+
+    do {
+        cout << "\n===== STUDENT MANAGEMENT SYSTEM =====\n";
+        cout << "1. Add Student\n";
+        cout << "2. Display All Students\n";
+        cout << "3. Search Student\n";
+        cout << "4. Update Student\n";
+        cout << "5. Delete Student\n";
+        cout << "0. Exit\n";
+        cout << "Enter your choice: ";
+
+        if (!(cin >> choice)) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Invalid input. Enter a number.\n";
+            continue;
+        }
+
+        switch (choice) {
+            case 1: addStudent(); break;
+            case 2: displayStudents(); break;
+            case 3: searchStudent(); break;
+            case 4: updateStudent(); break;
+            case 5: deleteStudent(); break;
+            case 0: cout << "Exiting program...\n"; break;
+            default: cout << "Invalid choice. Try again.\n";
+        }
+    } while (choice != 0);
+
+    return 0;
