@@ -1,0 +1,255 @@
+
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+#include <cstdio>
+using namespace std;
+
+class BankAccount {
+public:
+    int accountNo;
+    char name[50];
+    double balance;
+
+    void createAccount() {
+        cout << "Enter Account Number: ";
+        cin >> accountNo;
+
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        cout << "Enter Customer Name: ";
+        cin.getline(name, 50);
+
+        cout << "Enter Initial Deposit: Rs. ";
+        cin >> balance;
+    }
+
+    void display() const {
+        cout << "\nAccount Number : " << accountNo;
+        cout << "\nCustomer Name  : " << name;
+        cout << "\nBalance        : Rs. "
+             << fixed << setprecision(2) << balance << "\n";
+    }
+};
+
+bool accountExists(int accNo) {
+    BankAccount account;
+    ifstream file("accounts.dat", ios::binary);
+
+    while (file.read(reinterpret_cast<char*>(&account),
+                     sizeof(account))) {
+        if (account.accountNo == accNo)
+            return true;
+    }
+
+    return false;
+}
+
+void createAccount() {
+    BankAccount account;
+
+    cout << "\n--- Create Bank Account ---\n";
+    account.createAccount();
+
+    if (account.accountNo <= 0 ||
+        account.name[0] == '\0' ||
+        account.balance < 0) {
+        cout << "Invalid account details!\n";
+        return;
+    }
+
+    if (accountExists(account.accountNo)) {
+        cout << "Account number already exists!\n";
+        return;
+    }
+
+    ofstream file("accounts.dat",
+                  ios::binary | ios::app);
+
+    if (!file) {
+        cout << "Unable to open account file!\n";
+        return;
+    }
+
+    file.write(reinterpret_cast<char*>(&account),
+               sizeof(account));
+
+    file.close();
+    cout << "Account created successfully!\n";
+}
+
+void displayAllAccounts() {
+    BankAccount account;
+    ifstream file("accounts.dat", ios::binary);
+
+    if (!file) {
+        cout << "No accounts found.\n";
+        return;
+    }
+
+    bool found = false;
+
+    cout << "\n--- All Bank Accounts ---\n";
+
+    while (file.read(reinterpret_cast<char*>(&account),
+                     sizeof(account))) {
+        account.display();
+        found = true;
+    }
+
+    if (!found)
+        cout << "No accounts available.\n";
+
+    file.close();
+}
+
+void checkBalance() {
+    int accNo;
+    BankAccount account;
+
+    cout << "Enter Account Number: ";
+    cin >> accNo;
+
+    ifstream file("accounts.dat", ios::binary);
+
+    while (file.read(reinterpret_cast<char*>(&account),
+                     sizeof(account))) {
+        if (account.accountNo == accNo) {
+            cout << "\nAccount Holder: " << account.name;
+            cout << "\nAvailable Balance: Rs. "
+                 << fixed << setprecision(2)
+                 << account.balance << "\n";
+            file.close();
+            return;
+        }
+    }
+
+    file.close();
+    cout << "Account not found!\n";
+}
+
+void updateBalance(bool isDeposit) {
+    int accNo;
+    double amount;
+    BankAccount account;
+
+    cout << "Enter Account Number: ";
+    cin >> accNo;
+
+    ifstream checkFile("accounts.dat", ios::binary);
+    bool found = false;
+
+    while (checkFile.read(reinterpret_cast<char*>(&account),
+                          sizeof(account))) {
+        if (account.accountNo == accNo) {
+            found = true;
+            break;
+        }
+    }
+
+    checkFile.close();
+
+    if (!found) {
+        cout << "Account not found!\n";
+        return;
+    }
+
+    cout << "Enter amount: Rs. ";
+    cin >> amount;
+
+    if (amount <= 0) {
+        cout << "Amount must be greater than zero!\n";
+        return;
+    }
+
+    fstream file("accounts.dat",
+                 ios::binary | ios::in | ios::out);
+
+    while (file.read(reinterpret_cast<char*>(&account),
+                     sizeof(account))) {
+        if (account.accountNo == accNo) {
+            if (!isDeposit && amount > account.balance) {
+                cout << "Insufficient balance!\n";
+                file.close();
+                return;
+            }
+
+            if (isDeposit)
+                account.balance += amount;
+            else
+                account.balance -= amount;
+
+            file.seekp(-static_cast<streamoff>(sizeof(account)),
+                       ios::cur);
+
+            file.write(reinterpret_cast<char*>(&account),
+                       sizeof(account));
+
+            file.close();
+
+            if (isDeposit)
+                cout << "Deposit successful!\n";
+            else
+                cout << "Withdrawal successful!\n";
+
+            cout << "Updated Balance: Rs. "
+                 << fixed << setprecision(2)
+                 << account.balance << "\n";
+            return;
+        }
+    }
+
+    file.close();
+    cout << "Unable to update account!\n";
+}
+
+int main() {
+    int choice;
+
+    do {
+        cout << "\n================================\n";
+        cout << "     BANK MANAGEMENT SYSTEM\n";
+        cout << "================================\n";
+        cout << "1. Create Account\n";
+        cout << "2. Deposit Money\n";
+        cout << "3. Withdraw Money\n";
+        cout << "4. Check Balance\n";
+        cout << "5. Display All Accounts\n";
+        cout << "0. Exit\n";
+        cout << "Enter your choice: ";
+
+        if (!(cin >> choice)) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Invalid input!\n";
+            continue;
+        }
+
+        switch (choice) {
+            case 1:
+                createAccount();
+                break;
+            case 2:
+                updateBalance(true);
+                break;
+            case 3:
+                updateBalance(false);
+                break;
+            case 4:
+                checkBalance();
+                break;
+            case 5:
+                displayAllAccounts();
+                break;
+            case 0:
+                cout << "Thank you for using our banking system!\n";
+                break;
+            default:
+                cout << "Invalid choice! Try again.\n";
+        }
+
+    } while (choice != 0);
+
+    return 0;
+}
