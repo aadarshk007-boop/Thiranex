@@ -1,0 +1,276 @@
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <cstring>
+#include <limits>
+using namespace std;
+
+class Book {
+public:
+    int id;
+    char title[100];
+    char author[100];
+    bool issued;
+    int issuedTo;
+
+    void input() {
+        cout << "Enter Book ID: ";
+        cin >> id;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        cout << "Enter Book Title: ";
+        cin.getline(title, 100);
+
+        cout << "Enter Author Name: ";
+        cin.getline(author, 100);
+
+        issued = false;
+        issuedTo = 0;
+    }
+
+    void display() const {
+        cout << left << setw(8) << id
+             << setw(25) << title
+             << setw(22) << author
+             << setw(12) << (issued ? "Issued" : "Available");
+
+        if (issued)
+            cout << "Member ID: " << issuedTo;
+
+        cout << '\n';
+    }
+};
+
+class Library {
+private:
+    const char* filename = "books.dat";
+
+public:
+    bool bookExists(int id) {
+        Book b;
+        ifstream file(filename, ios::binary);
+
+        while (file.read(reinterpret_cast<char*>(&b), sizeof(b))) {
+            if (b.id == id)
+                return true;
+        }
+
+        return false;
+    }
+
+    void addBook() {
+        Book b;
+        cout << "\n--- Add Book ---\n";
+        b.input();
+
+        if (b.id <= 0 || b.title[0] == '\0' ||
+            b.author[0] == '\0') {
+            cout << "Invalid book details!\n";
+            return;
+        }
+
+        if (bookExists(b.id)) {
+            cout << "Book ID already exists!\n";
+            return;
+        }
+
+        ofstream file(filename, ios::binary | ios::app);
+
+        if (!file) {
+            cout << "Unable to open book file!\n";
+            return;
+        }
+
+        file.write(reinterpret_cast<char*>(&b), sizeof(b));
+        file.close();
+
+        cout << "Book added successfully!\n";
+    }
+
+    void displayBooks() {
+        Book b;
+        ifstream file(filename, ios::binary);
+
+        if (!file) {
+            cout << "No books found.\n";
+            return;
+        }
+
+        cout << "\n--- Library Books ---\n";
+        cout << left << setw(8) << "ID"
+             << setw(25) << "Title"
+             << setw(22) << "Author"
+             << setw(12) << "Status" << '\n';
+
+        cout << string(67, '-') << '\n';
+
+        bool found = false;
+
+        while (file.read(reinterpret_cast<char*>(&b), sizeof(b))) {
+            b.display();
+            found = true;
+        }
+
+        if (!found)
+            cout << "No books available.\n";
+
+        file.close();
+    }
+
+    void searchBook() {
+        int choice;
+        char key[100];
+        Book b;
+        bool found = false;
+
+        cout << "\nSearch by:\n";
+        cout << "1. Title\n";
+        cout << "2. Author\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        if (choice != 1 && choice != 2) {
+            cout << "Invalid choice!\n";
+            return;
+        }
+
+        cout << "Enter search text: ";
+        cin.getline(key, 100);
+
+        ifstream file(filename, ios::binary);
+
+        while (file.read(reinterpret_cast<char*>(&b), sizeof(b))) {
+            if ((choice == 1 && strstr(b.title, key) != nullptr) ||
+                (choice == 2 && strstr(b.author, key) != nullptr)) {
+                b.display();
+                found = true;
+            }
+        }
+
+        file.close();
+
+        if (!found)
+            cout << "No matching book found.\n";
+    }
+
+    void issueBook() {
+        int id, memberId;
+        Book b;
+
+        cout << "Enter Book ID: ";
+        cin >> id;
+
+        cout << "Enter Member ID: ";
+        cin >> memberId;
+
+        if (memberId <= 0) {
+            cout << "Invalid Member ID!\n";
+            return;
+        }
+
+        fstream file(filename, ios::binary | ios::in | ios::out);
+
+        while (file.read(reinterpret_cast<char*>(&b), sizeof(b))) {
+            if (b.id == id) {
+                if (b.issued) {
+                    cout << "Book is already issued!\n";
+                    file.close();
+                    return;
+                }
+
+                b.issued = true;
+                b.issuedTo = memberId;
+
+                file.seekp(-static_cast<streamoff>(sizeof(b)), ios::cur);
+                file.write(reinterpret_cast<char*>(&b), sizeof(b));
+                file.close();
+
+                cout << "Book issued successfully!\n";
+                return;
+            }
+        }
+
+        file.close();
+        cout << "Book not found!\n";
+    }
+
+    void returnBook() {
+        int id, memberId;
+        Book b;
+
+        cout << "Enter Book ID: ";
+        cin >> id;
+
+        cout << "Enter Member ID: ";
+        cin >> memberId;
+
+        fstream file(filename, ios::binary | ios::in | ios::out);
+
+        while (file.read(reinterpret_cast<char*>(&b), sizeof(b))) {
+            if (b.id == id) {
+                if (!b.issued) {
+                    cout << "This book is not issued.\n";
+                    file.close();
+                    return;
+                }
+
+                if (b.issuedTo != memberId) {
+                    cout << "This book is issued to another member!\n";
+                    file.close();
+                    return;
+                }
+
+                b.issued = false;
+                b.issuedTo = 0;
+
+                file.seekp(-static_cast<streamoff>(sizeof(b)), ios::cur);
+                file.write(reinterpret_cast<char*>(&b), sizeof(b));
+                file.close();
+
+                cout << "Book returned successfully!\n";
+                return;
+            }
+        }
+
+        file.close();
+        cout << "Book not found!\n";
+    }
+};
+
+int main() {
+    Library lib;
+    int choice;
+
+    do {
+        cout << "\n====================================\n";
+        cout << "       LIBRARY MANAGEMENT SYSTEM\n";
+        cout << "====================================\n";
+        cout << "1. Add Book\n";
+        cout << "2. Display All Books\n";
+        cout << "3. Search Book by Title or Author\n";
+        cout << "4. Issue Book\n";
+        cout << "5. Return Book\n";
+        cout << "0. Exit\n";
+        cout << "Enter your choice: ";
+
+        if (!(cin >> choice)) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Invalid input!\n";
+            continue;
+        }
+
+        switch (choice) {
+            case 1: lib.addBook(); break;
+            case 2: lib.displayBooks(); break;
+            case 3: lib.searchBook(); break;
+            case 4: lib.issueBook(); break;
+            case 5: lib.returnBook(); break;
+            case 0: cout << "Exiting Library System...\n"; break;
+            default: cout << "Invalid choice!\n";
+        }
+    } while (choice != 0);
+
+    return 0;
+}
